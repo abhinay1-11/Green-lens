@@ -1,0 +1,11 @@
+{
+  "number_of_images": 3,
+  "number_of_species_classes": 35,
+  "successful_predictions": 3,
+  "failed_predictions": 0,
+  "top1_accuracy": 0.0,
+  "top3_accuracy": 0.0,
+  "top5_accuracy": 0.0,
+  "average_latency_ms": 24137.93,
+  "median_latency_ms": 14560.27
+}

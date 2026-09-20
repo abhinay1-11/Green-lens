@@ -1,0 +1,4 @@
+image,ground_truth,prediction,confidence,top_3,top_5,correct,latency_ms
+bee_sample.jpg,Western Honey Bee (Apis mellifera),Paramyia lutea (Paramyia lutea),0.8%,Paramyia lutea; Euoniticellus fulvus; Melinopterus reyi,Paramyia lutea; Euoniticellus fulvus; Melinopterus reyi; Lomaptera lutea; Anthophora labrosa,False,43569.12
+butterfly_monarch.jpg,Monarch Butterfly (Danaus plexippus),Branded large fox (Rhabdomantis galatia),0.7%,Branded large fox; Solenopsis orbula; Ussuriana michaelis,Branded large fox; Solenopsis orbula; Ussuriana michaelis; Lomaptera lutea; Parasystoechus flavescens,False,14284.41
+dragonfly_blue.jpg,Green Darner Dragonfly (Anax junius),Camposcopus nigricornis (Camposcopus nigricornis),0.7%,Camposcopus nigricornis; Demodex longissimus; Vespa bilineata,Camposcopus nigricornis; Demodex longissimus; Vespa bilineata; Chlaenius propeagilis; Amara angustatoides,False,14560.27
