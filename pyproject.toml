@@ -1,0 +1,22 @@
+[project]
+name = "greenlens"
+version = "1.0.0"
+description = "GreenLens AI Biodiversity Monitor"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "sqlalchemy>=2.0.23",
+    "pydantic>=2.5.0",
+    "pydantic-settings>=2.1.0",
+    "pillow>=10.1.0",
+    "requests>=2.31.0",
+    "python-multipart>=0.0.6",
+    "pytest>=7.4.3",
+    "httpx>=0.25.1",
+    "shapely>=2.0.2",
+    "reportlab>=4.0.0",
+    "pybioclip>=2.0.0"
+]
+
+[tool.vercel]
+entrypoint = "backend.app.main:app"

@@ -1,0 +1,6 @@
+[project]
+name = "greenlens-backend"
+version = "1.0.0"
+
+[tool.vercel]
+entrypoint = "app.main:app"
