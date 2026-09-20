@@ -149,27 +149,29 @@ Copy `.env.example` to `.env` in both `backend/` and `frontend/`:
 
 ---
 
-## ☁️ Production Deployment
+## ☁️ Production Architecture & Deployment
 
-### Option A: Render (Recommended for Backend)
-The repository includes a `render.yaml` blueprint:
-1. Connect your GitHub repository to [Render](https://render.com).
-2. Create a **Web Service** using `render.yaml` or manually:
-   - **Build Command**: `pip install -r backend/requirements.txt`
-   - **Start Command**: `cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT`
-   - **Environment Variables**: Add `IDENTIFICATION_MODE=real` and `PLANTNET_API_KEY`.
+GreenLens uses a decoupled production architecture:
+- **Frontend**: React SPA deployed on **Vercel** (`https://green-lens-five.vercel.app/`).
+- **Backend**: FastAPI AI identification service deployed on a Python-compatible cloud platform (**Render** or **Railway**).
 
-### Option B: Vercel / Netlify (Recommended for Frontend)
-1. Import `frontend/` repository into [Vercel](https://vercel.com).
-2. Set Build Command to `npm run build` and Output Directory to `dist`.
-3. Set environment variable `VITE_API_BASE_URL` to your deployed backend API URL.
+### Backend Deployment (Render / Railway)
+1. **Repository Link**: Connect `https://github.com/abhinay1-11/Green-lens.git` to Render or Railway.
+2. **Build Command**: `pip install -r backend/requirements.txt` (or `pip install -r requirements.txt` if Root Directory is set to `backend`).
+3. **Start Command**:
+   - If Root Directory is repo root: `uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT`
+   - If Root Directory is `backend`: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+4. **Environment Variables**:
+   - `IDENTIFICATION_MODE=real`
+   - `CORS_ORIGINS=https://green-lens-five.vercel.app`
+   - `PLANTNET_API_KEY` *(Optional key for Pl@ntNet API)*
 
-### Option C: Docker Container Deployment
-```bash
-cd backend
-docker build -t greenlens-backend .
-docker run -p 8000:8000 -e IDENTIFICATION_MODE=real greenlens-backend
-```
+### Frontend Deployment (Vercel)
+1. Connect `https://github.com/abhinay1-11/Green-lens.git` to Vercel.
+2. Set Environment Variable in Vercel Project Settings:
+   - `VITE_API_BASE_URL` = `<PUBLIC_FASTAPI_BACKEND_URL>` (e.g. `https://greenlens-backend.onrender.com`)
+3. Trigger a fresh Vercel build so Vite bakes `VITE_API_BASE_URL` into the production JavaScript bundle.
+
 
 ---
 

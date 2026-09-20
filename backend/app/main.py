@@ -1,9 +1,18 @@
 import os
+import sys
+from pathlib import Path
+
+# Ensure 'backend' directory is in sys.path when running from repo root
+backend_dir = Path(__file__).resolve().parent.parent
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.config import settings
+
 from app.database import Base, engine, migrate_collections_schema
 from app.routers import health, providers, identification, observations, species, analytics, reports, collections
 
