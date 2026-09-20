@@ -10,4 +10,5 @@ pytest>=7.4.3
 httpx>=0.25.1
 shapely>=2.0.2
 reportlab>=4.0.0
-bioclip>=1.0.0
+pybioclip>=2.0.0
+
