@@ -6,7 +6,8 @@ import {
   BookOpen, ExternalLink, ShieldCheck, Layers, ChevronRight, Info, Plus,
   MapPin, Loader2
 } from 'lucide-react';
-import { predictSpecies, createObservation, searchSpecies } from '../services/api';
+import { predictSpecies, createObservation, searchSpecies, API_BASE } from '../services/api';
+
 import { CategoryBadge, MockBadge } from '../components/common/Badge';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import CameraCapture from '../components/identification/CameraCapture';
@@ -190,10 +191,24 @@ export default function Observe() {
       setStep(3);
     } catch (err) {
       console.error('Identification Error:', err);
-      setErrorDetails({
-        code: 'NETWORK_ERROR',
-        message: err.response?.data?.detail?.message || 'Failed to connect to identification provider.'
-      });
+      let code = 'NETWORK_ERROR';
+      let message = 'Failed to connect to identification provider.';
+
+      if (err.code === 'ERR_NETWORK' || !err.response) {
+        code = 'BACKEND_UNAVAILABLE';
+        message = `FastAPI backend is unreachable (${API_BASE}). Ensure the backend is deployed and VITE_API_BASE_URL is configured in Vercel.`;
+      } else if (err.response?.status === 504 || err.code === 'ECONNABORTED') {
+        code = 'TIMEOUT';
+        message = 'The AI identification request timed out while contacting the backend server.';
+      } else if (err.response?.data?.detail?.message) {
+        code = err.response.data.detail.code || 'IDENTIFICATION_FAILED';
+        message = err.response.data.detail.message;
+      } else if (err.response?.data?.message) {
+        code = err.response.data.code || 'IDENTIFICATION_FAILED';
+        message = err.response.data.message;
+      }
+
+      setErrorDetails({ code, message });
       setStep(3);
     } finally {
       setLoading(false);
@@ -228,10 +243,24 @@ export default function Observe() {
       }
     } catch (err) {
       console.error('Refine Error:', err);
-      setErrorDetails({
-        code: 'NETWORK_ERROR',
-        message: err.response?.data?.detail?.message || 'Failed to connect to identification provider.'
-      });
+      let code = 'NETWORK_ERROR';
+      let message = 'Failed to connect to identification provider.';
+
+      if (err.code === 'ERR_NETWORK' || !err.response) {
+        code = 'BACKEND_UNAVAILABLE';
+        message = `FastAPI backend is unreachable (${API_BASE}). Ensure the backend is deployed and VITE_API_BASE_URL is configured in Vercel.`;
+      } else if (err.response?.status === 504 || err.code === 'ECONNABORTED') {
+        code = 'TIMEOUT';
+        message = 'The AI identification request timed out while contacting the backend server.';
+      } else if (err.response?.data?.detail?.message) {
+        code = err.response.data.detail.code || 'IDENTIFICATION_FAILED';
+        message = err.response.data.detail.message;
+      } else if (err.response?.data?.message) {
+        code = err.response.data.code || 'IDENTIFICATION_FAILED';
+        message = err.response.data.message;
+      }
+
+      setErrorDetails({ code, message });
     } finally {
       setLoading(false);
     }
