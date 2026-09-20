@@ -15,6 +15,11 @@ venv/
 ENV/
 env/
 
+# Datasets & Heavy Assets
+data/
+data/datasets/
+
+
 # Databases & User Uploads
 *.db
 *.sqlite3

@@ -3,6 +3,7 @@ from app.config import settings
 
 router = APIRouter(tags=["Health"])
 
+@router.get("/")
 @router.get("/api/health")
 def health_check():
     return {
@@ -15,3 +16,4 @@ def health_check():
             "insect": settings.INSECT_IDENTIFICATION_PROVIDER
         }
     }
+
