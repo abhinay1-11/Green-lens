@@ -18,20 +18,25 @@ export default function App() {
   useEffect(() => {
     const cleanup = initTheme();
 
-    // Establish immediate backend connectivity on frontend application startup
+    // Establish immediate lightweight backend connectivity on startup
     const initBackendConnection = async () => {
       try {
         await getHealth();
-        await getProviderStatus();
-        console.log('[GreenLens] Startup backend health & AI provider readiness check completed.');
+        console.log('[GreenLens] Startup backend health check passed.');
       } catch (err) {
-        console.warn('[GreenLens] Startup backend connectivity note:', err);
+        console.warn('[GreenLens] Startup backend connectivity note:', err?.message || err);
       }
+
+      // Non-blocking background provider status check
+      getProviderStatus()
+        .then(() => console.log('[GreenLens] Provider status check completed.'))
+        .catch((err) => console.log('[GreenLens] Provider status note:', err?.message || err));
     };
 
     initBackendConnection();
     return cleanup;
   }, []);
+
 
   return (
     <Router>

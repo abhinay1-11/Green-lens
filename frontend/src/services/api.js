@@ -21,14 +21,15 @@ const api = axios.create({
 
 
 export const getHealth = async () => {
-  const response = await api.get('/health');
+  const response = await api.get('/health', { timeout: 4000 });
   return response.data;
 };
 
 export const getProviderStatus = async () => {
-  const response = await api.get('/providers/status');
+  const response = await api.get('/providers/status', { timeout: 3000 });
   return response.data;
 };
+
 
 export const predictSpecies = async (formData) => {
   const response = await api.post('/identification/predict', formData, {

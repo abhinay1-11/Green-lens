@@ -195,12 +195,12 @@ export default function Observe() {
       let code = 'NETWORK_ERROR';
       let message = 'Failed to connect to identification provider.';
 
-      if (err.code === 'ERR_NETWORK' || !err.response) {
+      if (err.code === 'ECONNABORTED' || err.response?.status === 504 || (err.message && err.message.toLowerCase().includes('timeout'))) {
+        code = 'IDENTIFICATION_TIMEOUT';
+        message = 'Identification is taking longer than expected. Please try again.';
+      } else if (err.code === 'ERR_NETWORK' || !err.response) {
         code = 'BACKEND_UNAVAILABLE';
-        message = `FastAPI backend is unreachable (${API_BASE}). Ensure the backend is deployed and VITE_API_BASE_URL is configured in Vercel.`;
-      } else if (err.response?.status === 504 || err.code === 'ECONNABORTED') {
-        code = 'TIMEOUT';
-        message = 'The AI identification request timed out while contacting the backend server.';
+        message = 'FastAPI backend is unreachable. Please verify network connection.';
       } else if (err.response?.data?.detail?.message) {
         code = err.response.data.detail.code || 'IDENTIFICATION_FAILED';
         message = err.response.data.detail.message;
@@ -247,12 +247,12 @@ export default function Observe() {
       let code = 'NETWORK_ERROR';
       let message = 'Failed to connect to identification provider.';
 
-      if (err.code === 'ERR_NETWORK' || !err.response) {
+      if (err.code === 'ECONNABORTED' || err.response?.status === 504 || (err.message && err.message.toLowerCase().includes('timeout'))) {
+        code = 'IDENTIFICATION_TIMEOUT';
+        message = 'Identification is taking longer than expected. Please try again.';
+      } else if (err.code === 'ERR_NETWORK' || !err.response) {
         code = 'BACKEND_UNAVAILABLE';
-        message = `FastAPI backend is unreachable (${API_BASE}). Ensure the backend is deployed and VITE_API_BASE_URL is configured in Vercel.`;
-      } else if (err.response?.status === 504 || err.code === 'ECONNABORTED') {
-        code = 'TIMEOUT';
-        message = 'The AI identification request timed out while contacting the backend server.';
+        message = 'FastAPI backend is unreachable. Please verify network connection.';
       } else if (err.response?.data?.detail?.message) {
         code = err.response.data.detail.code || 'IDENTIFICATION_FAILED';
         message = err.response.data.detail.message;
