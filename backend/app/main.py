@@ -58,28 +58,24 @@ def _bg_warmup():
 
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
-    print("\n[STARTUP] Initializing GreenLens AI providers...")
+    print("\n[STARTUP] GreenLens AI services starting...")
     t_start = time.time()
     
-    # 1. Initialize BioCLIP 2 Model Singleton
-    try:
-        from app.services.identification.bioclip import BioCLIPModelSingleton
-        BioCLIPModelSingleton.get_classifier()
-        print("[STARTUP] BioCLIP 2 loaded")
-    except Exception as e:
-        print(f"[STARTUP] BioCLIP 2 startup note: {e}")
+    # Enable lazy loading for BioCLIP 2 (loads on demand when first request arrives)
+    print("[STARTUP] BioCLIP: lazy initialization enabled")
 
-    # 2. Initialize reusable HTTP species session
+    # Initialize reusable HTTP species session
     try:
         get_http_session()
         print("[STARTUP] Species services initialized")
     except Exception as e:
         print(f"[STARTUP] Species services note: {e}")
 
-    # 3. Background warm up for external biodiversity connectivity
+    # Background warm up for external biodiversity connectivity
     threading.Thread(target=_bg_warmup, daemon=True).start()
     print(f"[STARTUP] GreenLens AI services ready in {time.time() - t_start:.2f}s\n")
     yield
+
 
 app = FastAPI(
     title=settings.APP_NAME,
