@@ -66,6 +66,10 @@ async def predict_species(
     t_upload_end = time.time()
     upload_time = t_upload_end - t_upload_start
 
+    total_kb = sum(len(img.get("file_bytes", b"")) for img in validated_images) / 1024.0
+    print(f"\n[IDENTIFY] Request received for category: '{category}'")
+    print(f"[IDENTIFY] Image received: {total_kb:.2f} KB ({upload_time:.2f}s)")
+
     # Model identification
     provider = get_identification_provider(category)
     result = provider.identify(validated_images, category=category)
@@ -85,26 +89,15 @@ async def predict_species(
                 if profile:
                     result.species_profile = profile.model_dump(mode="json")
     except Exception as enrich_err:
-        print(f"[IdentificationRouter] Enrichment error ignored: {enrich_err}")
+        print(f"[IDENTIFY] Enrichment error ignored: {enrich_err}")
     t_enrich_end = time.time()
     enrich_time = t_enrich_end - t_enrich_start
+    print(f"[IDENTIFY] Response processing & enrichment: {enrich_time:.2f}s")
 
     t_total_end = time.time()
     total_time = t_total_end - t_total_start
 
-    perf_details = getattr(result, "_perf_details", {})
-    prep_time = perf_details.get("preprocessing", 0.01)
-    init_time = perf_details.get("model_initialization", 0.00)
-    infer_time = perf_details.get("inference", 0.15)
-    tax_time = perf_details.get("taxonomy", 0.01)
-
-    print(f"[PERF] upload: {upload_time:.2f}s")
-    print(f"[PERF] preprocessing: {prep_time:.2f}s")
-    print(f"[PERF] model initialization: {init_time:.2f}s")
-    print(f"[PERF] inference: {infer_time:.2f}s")
-    print(f"[PERF] taxonomy: {tax_time:.2f}s")
-    print(f"[PERF] enrichment: {enrich_time:.2f}s")
-    print(f"[PERF] total: {total_time:.2f}s")
+    print(f"[IDENTIFY] Total identification time: {total_time:.2f}s\n")
 
     return result
 

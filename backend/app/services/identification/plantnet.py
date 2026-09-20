@@ -1,3 +1,4 @@
+import time
 import requests
 from typing import List, Optional, Dict, Any
 
@@ -7,6 +8,7 @@ from app.services.identification.biodiversity_fallback import BiodiversityFallba
 from app.schemas.identification import PredictionResponse, PredictionItem, ErrorDetail
 from app.utils.confidence import normalize_confidence
 from app.utils.image_validation import preprocess_image_for_model
+from app.services.species_enrichment.session import get_http_session
 
 PLANTNET_API_BASE = "https://my-api.plantnet.org/v2/identify"
 
@@ -28,9 +30,13 @@ class PlantNetProvider(IdentificationProvider):
         category: str = "plant",
         location: Optional[Dict[str, float]] = None
     ) -> PredictionResponse:
+        t_init_start = time.time()
+        print("[IDENTIFY] Provider selected: plant (Pl@ntNet API v2)")
+        print(f"[IDENTIFY] Provider initialization: {time.time() - t_init_start:.2f}s")
+
         # Check API Key availability
         if not self.api_key:
-            # Fall back to General Biodiversity model if Pl@ntNet key is not configured
+            print("[IDENTIFY] Pl@ntNet API key not set. Executing local biodiversity fallback...")
             fallback_res = self.fallback_provider.identify(images, category="plant", location=location)
             if fallback_res.success:
                 return fallback_res
@@ -56,6 +62,7 @@ class PlantNetProvider(IdentificationProvider):
         files = []
         data = []
 
+        t_prep_start = time.time()
         # Up to 5 images per request supported by Pl@ntNet
         for idx, img in enumerate(images[:5]):
             raw_bytes = img.get("file_bytes")
@@ -71,6 +78,9 @@ class PlantNetProvider(IdentificationProvider):
             files.append(("images", (filename, processed_bytes, "image/jpeg")))
             data.append(("organs", organ))
 
+        t_prep_end = time.time()
+        print(f"[IDENTIFY] Image preprocessing: {t_prep_end - t_prep_start:.2f}s")
+
         if not files:
             return PredictionResponse(
                 success=False,
@@ -82,7 +92,13 @@ class PlantNetProvider(IdentificationProvider):
             )
 
         try:
-            response = requests.post(url, files=files, data=data, timeout=15)
+            session = get_http_session()
+            t_api_start = time.time()
+            print("[IDENTIFY] External API/model call started")
+            response = session.post(url, files=files, data=data, timeout=10)
+            t_api_end = time.time()
+            print(f"[IDENTIFY] External API/model call completed: {t_api_end - t_api_start:.2f}s (Status: {response.status_code})")
+
 
             if response.status_code in (401, 403):
                 fallback_res = self.fallback_provider.identify(images, category="plant", location=location)

@@ -162,10 +162,11 @@ export default function Observe() {
   };
 
   const handleIdentify = async () => {
-    if (!selectedFiles.length) return;
+    if (!selectedFiles.length || loading) return;
 
     setLoading(true);
     setErrorDetails(null);
+
 
     try {
       const formData = new FormData();
