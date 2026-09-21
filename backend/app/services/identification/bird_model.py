@@ -1,6 +1,7 @@
 import io
 import os
 import json
+import threading
 from pathlib import Path
 from typing import List, Tuple
 import numpy as np
@@ -10,6 +11,7 @@ _SESSION = None
 _INPUT_NAME = None
 _OUTPUT_NAME = None
 _ID2LABEL = None
+_BIRD_LOCK = threading.Lock()
 
 MODEL_PATH = Path(__file__).resolve().parents[3] / "models" / "bird_species.onnx"
 CONFIG_PATH = Path(__file__).resolve().parents[3] / "models" / "bird_species_config.json"
@@ -26,29 +28,33 @@ def _load_bird_model():
     global _SESSION, _INPUT_NAME, _OUTPUT_NAME, _ID2LABEL
 
     if _SESSION is None:
-        import onnxruntime as ort
+        with _BIRD_LOCK:
+            if _SESSION is None:
+                import onnxruntime as ort
 
-        if not MODEL_PATH.exists():
-            raise FileNotFoundError(f"Bird ONNX model file not found at {MODEL_PATH}")
+                if not MODEL_PATH.exists():
+                    raise FileNotFoundError(f"Bird ONNX model file not found at {MODEL_PATH}")
 
-        opts = ort.SessionOptions()
-        opts.intra_op_num_threads = 1
-        opts.inter_op_num_threads = 1
+                opts = ort.SessionOptions()
+                opts.intra_op_num_threads = 1
+                opts.inter_op_num_threads = 1
+                opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+                opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
 
-        _SESSION = ort.InferenceSession(
-            str(MODEL_PATH),
-            sess_options=opts,
-            providers=["CPUExecutionProvider"]
-        )
-        _INPUT_NAME = _SESSION.get_inputs()[0].name
-        _OUTPUT_NAME = _SESSION.get_outputs()[0].name
+                _SESSION = ort.InferenceSession(
+                    str(MODEL_PATH),
+                    sess_options=opts,
+                    providers=["CPUExecutionProvider"]
+                )
+                _INPUT_NAME = _SESSION.get_inputs()[0].name
+                _OUTPUT_NAME = _SESSION.get_outputs()[0].name
 
-        if CONFIG_PATH.exists():
-            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                cfg = json.load(f)
-                _ID2LABEL = cfg.get("id2label", {})
-        else:
-            _ID2LABEL = {}
+                if CONFIG_PATH.exists():
+                    with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                        cfg = json.load(f)
+                        _ID2LABEL = cfg.get("id2label", {})
+                else:
+                    _ID2LABEL = {}
 
     return _SESSION, _INPUT_NAME, _OUTPUT_NAME, _ID2LABEL
 

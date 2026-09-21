@@ -2,17 +2,18 @@ import os
 import io
 import json
 import logging
+import threading
 from typing import List, Dict, Any, Optional
 import numpy as np
 from PIL import Image, ImageOps
-import onnxruntime as ort
 
 logger = logging.getLogger("greenlens.identification.insect_model")
 
-_INSECT_SESSION: Optional[ort.InferenceSession] = None
+_INSECT_SESSION: Optional[Any] = None
 _INSECT_CONFIG: Optional[Dict[str, Any]] = None
+_INSECT_LOCK = threading.Lock()
 
-MODEL_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__)))), "models")
+MODEL_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "models"))
 MODEL_PATH = os.path.join(MODEL_DIR, "insect_species.onnx")
 CONFIG_PATH = os.path.join(MODEL_DIR, "insect_species_config.json")
 
@@ -20,43 +21,58 @@ CONFIG_PATH = os.path.join(MODEL_DIR, "insect_species_config.json")
 def _get_insect_config() -> Dict[str, Any]:
     global _INSECT_CONFIG
     if _INSECT_CONFIG is None:
-        if os.path.exists(CONFIG_PATH):
-            with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                _INSECT_CONFIG = json.load(f)
-        else:
-            logger.warning("Insect config file not found at %s. Falling back to empty dict.", CONFIG_PATH)
-            _INSECT_CONFIG = {}
+        with _INSECT_LOCK:
+            if _INSECT_CONFIG is None:
+                if os.path.exists(CONFIG_PATH):
+                    try:
+                        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+                            _INSECT_CONFIG = json.load(f)
+                    except Exception as e:
+                        logger.error("[Insect ONNX] Failed to load config JSON: %s", e)
+                        _INSECT_CONFIG = {}
+                else:
+                    logger.warning("[Insect ONNX] Config file not found at %s. Using empty fallback.", CONFIG_PATH)
+                    _INSECT_CONFIG = {}
     return _INSECT_CONFIG
 
 
-def _get_insect_session() -> ort.InferenceSession:
+def _get_insect_session():
     global _INSECT_SESSION
     if _INSECT_SESSION is None:
-        if not os.path.exists(MODEL_PATH):
-            raise FileNotFoundError(f"Insect ONNX model not found at {MODEL_PATH}")
+        with _INSECT_LOCK:
+            if _INSECT_SESSION is None:
+                if not os.path.exists(MODEL_PATH):
+                    raise FileNotFoundError(f"Insect ONNX model file not found at {MODEL_PATH}")
 
-        opts = ort.SessionOptions()
-        opts.intra_op_num_threads = 1
-        opts.inter_op_num_threads = 1
-        opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
-        opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+                print("[Insect ONNX] Loading model...")
+                import onnxruntime as ort
 
-        _INSECT_SESSION = ort.InferenceSession(
-            MODEL_PATH,
-            sess_options=opts,
-            providers=["CPUExecutionProvider"]
-        )
-        logger.info("Loaded Insect EfficientNet-B0 ONNX session successfully.")
+                opts = ort.SessionOptions()
+                opts.intra_op_num_threads = 1
+                opts.inter_op_num_threads = 1
+                opts.execution_mode = ort.ExecutionMode.ORT_SEQUENTIAL
+                opts.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+                opts.enable_cpu_mem_arena = True
+                opts.enable_mem_pattern = True
+
+                _INSECT_SESSION = ort.InferenceSession(
+                    MODEL_PATH,
+                    sess_options=opts,
+                    providers=["CPUExecutionProvider"]
+                )
+                print("[Insect ONNX] Model loaded successfully")
     return _INSECT_SESSION
 
 
 def run_insect_species_classifier(image_bytes: bytes, top_k: int = 5) -> List[Dict[str, Any]]:
     """
     Runs insect classification using the EfficientNet-B0 ONNX model.
-    Returns a list of dicts containing class metadata and confidence scores.
+    Model is lazy loaded on the first call. Subsequent calls reuse cached session.
     """
     session = _get_insect_session()
     config = _get_insect_config()
+
+    print("[Insect ONNX] Running inference...")
 
     # Preprocess image
     image = Image.open(io.BytesIO(image_bytes))
@@ -70,7 +86,7 @@ def run_insect_species_classifier(image_bytes: bytes, top_k: int = 5) -> List[Di
     input_name = session.get_inputs()[0].name
     outputs = session.run(None, {input_name: img_np})[0][0]
 
-    # Apply Softmax over 27 classes
+    # Apply Softmax over logits
     exp_logits = np.exp(outputs - np.max(outputs))
     probabilities = exp_logits / np.sum(exp_logits)
 
@@ -99,4 +115,5 @@ def run_insect_species_classifier(image_bytes: bytes, top_k: int = 5) -> List[Di
             "is_non_insect": is_non_insect
         })
 
+    print("[Insect ONNX] Inference completed")
     return results

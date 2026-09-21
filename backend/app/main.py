@@ -41,20 +41,8 @@ Base.metadata.create_all(bind=engine)
 os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
 
 from contextlib import asynccontextmanager
-import threading
 import time
-from app.services.species_enrichment import SpeciesEnrichmentService
 from app.services.species_enrichment.session import get_http_session
-
-def _bg_warmup():
-    try:
-        session = get_http_session()
-        session.get("https://api.gbif.org/v1/species/match?name=Apis%20mellifera", timeout=3.0)
-        session.get("https://en.wikipedia.org/api/rest_v1/page/summary/Apis_mellifera", timeout=3.0)
-        for sp in ["Centrocercus urophasianus", "Azadirachta indica", "Apis mellifera"]:
-            SpeciesEnrichmentService.get_species_profile(sp)
-    except Exception as e:
-        print(f"[Warmup] Note: {e}")
 
 @asynccontextmanager
 async def lifespan(app_instance: FastAPI):
@@ -71,8 +59,6 @@ async def lifespan(app_instance: FastAPI):
     except Exception as e:
         print(f"[STARTUP] Species services note: {e}")
 
-    # Background warm up for external biodiversity connectivity
-    threading.Thread(target=_bg_warmup, daemon=True).start()
     print(f"[STARTUP] GreenLens AI services ready in {time.time() - t_start:.2f}s\n")
     yield
 
