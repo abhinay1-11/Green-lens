@@ -31,7 +31,8 @@ class PlantNetProvider(IdentificationProvider):
         location: Optional[Dict[str, float]] = None
     ) -> PredictionResponse:
         t_init_start = time.time()
-        print("[IDENTIFY] Provider selected: plant (Pl@ntNet API v2)")
+        print("[IDENTIFY] Category: plant")
+        print("[IDENTIFY] Provider: PlantNetProvider")
         print(f"[IDENTIFY] Provider initialization: {time.time() - t_init_start:.2f}s")
 
         # Check API Key availability

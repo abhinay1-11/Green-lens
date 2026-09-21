@@ -24,11 +24,11 @@ class Settings(BaseSettings):
     PLANT_IDENTIFICATION_PROVIDER: str = "plantnet" # plantnet, mock
     PLANTNET_API_KEY: str = ""
     
-    BIRD_IDENTIFICATION_PROVIDER: str = "bioclip"   # bioclip, legacy_pytorch, mock
+    BIRD_IDENTIFICATION_PROVIDER: str = "legacy_pytorch"   # legacy_pytorch, bioclip, mock
     BIRD_MIN_CONFIDENCE: float = 0.30
     BIRD_PROVIDER_API_KEY: str = ""
     
-    INSECT_IDENTIFICATION_PROVIDER: str = "open"   # open, mock
+    INSECT_IDENTIFICATION_PROVIDER: str = "local_ai"   # local_ai, bioclip, mock
     INSECT_PROVIDER_API_KEY: str = ""
     
     # Hugging Face Token (optional)

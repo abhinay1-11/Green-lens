@@ -25,8 +25,8 @@ def print_startup_diagnostics():
     print(f"Identification Mode: {settings.IDENTIFICATION_MODE.upper()}")
     print(f"Plant Provider: Pl@ntNet API v2")
     print(f"PlantNet API Key Configured: {'YES' if has_key else 'NO'}")
-    print(f"Bird Provider: BioCLIP 2 (Lazy Initialized)")
-    print(f"Insect Provider: Insecta Vision AI Engine")
+    print(f"Bird Provider: {settings.BIRD_IDENTIFICATION_PROVIDER}")
+    print(f"Insect Provider: {settings.INSECT_IDENTIFICATION_PROVIDER}")
     print("==================================================\n")
 
 print_startup_diagnostics()
@@ -61,8 +61,8 @@ async def lifespan(app_instance: FastAPI):
     print("\n[STARTUP] GreenLens AI services starting...")
     t_start = time.time()
     
-    # Enable lazy loading for BioCLIP 2 (loads on demand when first request arrives)
-    print("[STARTUP] BioCLIP: lazy initialization enabled")
+    if settings.BIRD_IDENTIFICATION_PROVIDER == "bioclip" or settings.INSECT_IDENTIFICATION_PROVIDER == "bioclip":
+        print("[STARTUP] BioCLIP: lazy initialization enabled")
 
     # Initialize reusable HTTP species session
     try:

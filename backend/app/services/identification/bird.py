@@ -1,8 +1,8 @@
+import os
 from typing import List, Optional, Dict, Any
 
 from app.config import settings
 from app.services.identification.base import IdentificationProvider
-from app.services.identification.bioclip import BioCLIPBirdProvider
 from app.services.identification.mock import MockProvider
 from app.services.identification.local_model import run_local_species_classifier
 from app.schemas.identification import PredictionResponse, PredictionItem, ErrorDetail
@@ -21,7 +21,22 @@ class LegacyBirdProvider(IdentificationProvider):
         category: str = "bird",
         location: Optional[Dict[str, float]] = None
     ) -> PredictionResponse:
-        if not images or not images[0].get("file_bytes"):
+        if not images:
+            return PredictionResponse(
+                success=False,
+                category="bird",
+                provider="legacy_bird_ai",
+                identification_status="IDENTIFICATION_UNAVAILABLE",
+                predictions=[],
+                error=ErrorDetail(code="INVALID_IMAGE", message="No valid bird image provided.")
+            )
+
+        raw_bytes = images[0].get("file_bytes")
+        if not raw_bytes and images[0].get("saved_path") and os.path.exists(images[0]["saved_path"]):
+            with open(images[0]["saved_path"], "rb") as f:
+                raw_bytes = f.read()
+
+        if not raw_bytes:
             return PredictionResponse(
                 success=False,
                 category="bird",
@@ -32,7 +47,6 @@ class LegacyBirdProvider(IdentificationProvider):
             )
 
         try:
-            raw_bytes = images[0]["file_bytes"]
             raw_predictions = run_local_species_classifier(raw_bytes, target_group="bird")
 
             predictions = []
@@ -82,12 +96,11 @@ class LegacyBirdProvider(IdentificationProvider):
 class BirdProvider(IdentificationProvider):
     """
     Main Bird Identification Provider Router.
-    Routes inference requests to BioCLIPBirdProvider (BioCLIP 2) by default,
+    Routes inference requests to BioCLIPBirdProvider (BioCLIP 2) when configured,
     or LegacyBirdProvider / MockProvider based on settings.
     """
 
     def __init__(self, api_key: Optional[str] = None):
-        self.bioclip_provider = BioCLIPBirdProvider()
         self.legacy_provider = LegacyBirdProvider()
         self.mock_provider = MockProvider()
 
@@ -103,10 +116,19 @@ class BirdProvider(IdentificationProvider):
             res.detected_category = "bird"
             return res
 
-        provider_choice = getattr(settings, "BIRD_IDENTIFICATION_PROVIDER", "bioclip").lower()
+        provider_choice = getattr(settings, "BIRD_IDENTIFICATION_PROVIDER", "legacy_pytorch").lower()
 
-        if provider_choice in ("legacy_pytorch", "local_ai", "legacy"):
+        if provider_choice in ("legacy_pytorch", "local_ai", "legacy", "pytorch"):
+            print("[IDENTIFY] Category: bird")
+            print("[IDENTIFY] Provider: LegacyBirdProvider")
             return self.legacy_provider.identify(images, category=category, location=location)
+        elif provider_choice == "bioclip":
+            print("[IDENTIFY] Category: bird")
+            print("[IDENTIFY] Provider: BioCLIPBirdProvider")
+            from app.services.identification.bioclip import BioCLIPBirdProvider
+            return BioCLIPBirdProvider().identify(images, category=category, location=location)
         else:
-            # Default active provider: BioCLIP 2
-            return self.bioclip_provider.identify(images, category=category, location=location)
+            print("[IDENTIFY] Category: bird")
+            print("[IDENTIFY] Provider: LegacyBirdProvider")
+            return self.legacy_provider.identify(images, category=category, location=location)
+
