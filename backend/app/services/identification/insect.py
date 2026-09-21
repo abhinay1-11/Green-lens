@@ -118,9 +118,32 @@ class InsectProvider(IdentificationProvider):
 
             raw_predictions = run_local_species_classifier(raw_bytes, target_group="insect")
 
+            # No sufficiently confident insect prediction.
+            if not raw_predictions:
+                return PredictionResponse(
+                    success=False,
+                    category="insect",
+                    detected_category="insect",
+                    provider="insect_local_ai",
+                    model_name="MobileNetV3-Small fallback classifier",
+                    model_version="v1.0",
+                    identification_status="IDENTIFICATION_UNAVAILABLE",
+                    predictions=[],
+                    is_mock=False,
+                    error=ErrorDetail(
+                        code="NO_INSECT_DETECTED",
+                        message="No insect could be identified with sufficient confidence."
+                    )
+                )
+
             predictions = []
-            for idx, (sci_name, common_name, score) in enumerate(raw_predictions, start=1):
+
+            for idx, (sci_name, common_name, score) in enumerate(
+                raw_predictions,
+                start=1
+            ):
                 norm_score = normalize_confidence(score)
+
                 predictions.append(
                     PredictionItem(
                         rank=idx,
@@ -131,7 +154,11 @@ class InsectProvider(IdentificationProvider):
                     )
                 )
 
-            top_score = predictions[0].confidence if predictions else 0.0
+            top_score = (
+                predictions[0].confidence
+                if predictions
+                else 0.0
+            )
             ident_status = "HIGH_CONFIDENCE" if top_score >= 0.80 else ("MEDIUM_CONFIDENCE" if top_score >= 0.50 else "LOW_CONFIDENCE")
 
             return PredictionResponse(
@@ -139,11 +166,8 @@ class InsectProvider(IdentificationProvider):
                 category="insect",
                 detected_category="insect",
                 provider="insect_local_ai",
-                model_name="PyTorch Insecta Vision Classifier",
+                model_name="MobileNetV3-Small Insect Classifier",
                 model_version="v1.0",
-                identification_status=ident_status,
-                predictions=predictions,
-                is_mock=False
             )
 
         except Exception as exc:

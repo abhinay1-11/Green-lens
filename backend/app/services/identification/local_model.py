@@ -1,24 +1,135 @@
 import io
+import gc
+from pathlib import Path
 from typing import List, Tuple
 
-from PIL import Image
+import numpy as np
+from PIL import Image, ImageOps
+import onnxruntime as ort
 
 
-_MODEL = None
-_TRANSFORMS = None
+# ============================================================
+# CONFIGURATION
+# ============================================================
+
+# Expected location:
+#
+# backend/
+# ├── app/
+# │   └── services/
+# │       └── identification/
+# │           └── local_model.py
+# │
+# └── models/
+#     └── mobilenet_v3_small.onnx
+#
+MODEL_PATH = (
+    Path(__file__).resolve().parents[3]
+    / "models"
+    / "mobilenet_v3_small.onnx"
+)
+
+INPUT_SIZE = 224
+
+# ImageNet normalization used by torchvision MobileNetV3-Small.
+# These values match the official torchvision preprocessing.
+MEAN = np.array(
+    [0.485, 0.456, 0.406],
+    dtype=np.float32,
+).reshape(1, 1, 3)
+
+STD = np.array(
+    [0.229, 0.224, 0.225],
+    dtype=np.float32,
+).reshape(1, 1, 3)
+
+
+# ============================================================
+# GLOBAL MODEL STATE
+# ============================================================
+
+_SESSION = None
+_INPUT_NAME = None
+_OUTPUT_NAME = None
 _CATEGORIES = None
-_TORCH = None
 
 
-# Exact ImageNet 1k class indices for Birds (Aves)
-BIRD_CLASS_INDICES = list(
-    set(range(8, 25))
-    | set(range(80, 101))
-    | set(range(127, 147))
+# ============================================================
+# IMAGENET CATEGORIES
+# ============================================================
+#
+# IMPORTANT:
+# MobileNetV3-Small ImageNet weights use the standard 1000
+# ImageNet categories.
+#
+# We keep the categories required by the existing GreenLens
+# classifier interface.
+#
+# The full category list is loaded from the optional file:
+#
+# backend/models/imagenet_classes.txt
+#
+# If that file is unavailable, the model can still run, but
+# predictions will use ImageNet class IDs as fallback names.
+#
+
+def _load_categories():
+    global _CATEGORIES
+
+    if _CATEGORIES is not None:
+        return _CATEGORIES
+
+    category_file = (
+        Path(__file__).resolve().parents[3]
+        / "models"
+        / "imagenet_classes.txt"
+    )
+
+    if category_file.exists():
+        try:
+            with open(category_file, "r", encoding="utf-8") as f:
+                categories = [
+                    line.strip()
+                    for line in f
+                    if line.strip()
+                ]
+
+            if len(categories) >= 1000:
+                _CATEGORIES = categories[:1000]
+                return _CATEGORIES
+
+        except Exception:
+            pass
+
+    # Fallback.
+    # The model still works, but unknown ImageNet classes are
+    # represented by their numeric class index.
+    _CATEGORIES = [
+        f"ImageNet class {i}"
+        for i in range(1000)
+    ]
+
+    return _CATEGORIES
+
+
+# ============================================================
+# BIRD CLASS INDICES
+# ============================================================
+
+# Existing GreenLens ImageNet bird class selection.
+BIRD_CLASS_INDICES = sorted(
+    list(
+        set(range(8, 25))
+        | set(range(80, 101))
+        | set(range(127, 147))
+    )
 )
 
 
-# Exact ImageNet 1k taxonomy mapping for Insects & Arthropods
+# ============================================================
+# INSECT / ARTHROPOD TAXONOMY
+# ============================================================
+
 INSECT_ARTHROPOD_TAXONOMY_MAP = {
     71: ("Centruroides sculpturatus", "Arizona Bark Scorpion"),
     72: ("Argiope aurantia", "Black and Yellow Garden Spider"),
@@ -28,6 +139,7 @@ INSECT_ARTHROPOD_TAXONOMY_MAP = {
     77: ("Hogna carolinensis", "Carolina Wolf Spider"),
     78: ("Ixodes scapularis", "Blacklegged Tick"),
     79: ("Scolopendra heros", "Giant Desert Centipede"),
+
     300: ("Cicindela sexguttata", "Six-spotted Tiger Beetle"),
     301: ("Coccinella septempunctata", "Seven-spot Ladybird"),
     302: ("Carabidae", "Ground Beetle"),
@@ -57,166 +169,277 @@ INSECT_ARTHROPOD_TAXONOMY_MAP = {
     326: ("Celastrina ladon", "Spring Azure Butterfly"),
 }
 
-INSECT_CLASS_INDICES = sorted(INSECT_ARTHROPOD_TAXONOMY_MAP.keys())
+INSECT_CLASS_INDICES = sorted(
+    INSECT_ARTHROPOD_TAXONOMY_MAP.keys()
+)
 
 
-# Maximum image dimension before model preprocessing.
-# 384 is more than enough because the ResNet transform ultimately
-# resizes/crops to 224x224.
-MAX_IMAGE_SIZE = 384
-
+# ============================================================
+# ONNX SESSION
+# ============================================================
 
 def _load_model():
     """
-    Lazily load PyTorch and ResNet50.
+    Lazily loads the ONNX model.
 
     IMPORTANT:
-    torch and torchvision are intentionally imported here instead
-    of at module startup. This keeps /health and other lightweight
-    requests from immediately paying the full PyTorch import cost.
-    """
-    global _MODEL, _TRANSFORMS, _CATEGORIES, _TORCH
+    This does NOT import torch or torchvision.
 
-    if _MODEL is None:
-        print("[LOCAL_MODEL] Loading PyTorch ResNet50 lazily...")
-
-        import torch
-        import torchvision.models as models
-
-        _TORCH = torch
-
-        weights = models.ResNet50_Weights.DEFAULT
-
-        _MODEL = models.resnet50(weights=weights)
-        _MODEL.eval()
-
-        _TRANSFORMS = weights.transforms()
-        _CATEGORIES = weights.meta["categories"]
-
-        print("[LOCAL_MODEL] ResNet50 loaded successfully.")
-
-    return _MODEL, _TRANSFORMS, _CATEGORIES, _TORCH
-
-
-def _prepare_image(image_bytes: bytes) -> Image.Image:
-    """
-    Safely prepare an uploaded image while minimizing memory usage.
-
-    The critical optimization is resizing BEFORE converting to RGB.
-    This prevents a large 12MP/48MP camera image from remaining as
-    a huge RGB bitmap in memory.
+    ONNX Runtime performs CPU inference directly.
     """
 
-    image_stream = io.BytesIO(image_bytes)
+    global _SESSION
+    global _INPUT_NAME
+    global _OUTPUT_NAME
 
-    try:
-        img = Image.open(image_stream)
+    if _SESSION is not None:
+        return _SESSION, _INPUT_NAME, _OUTPUT_NAME
 
-        # Fix EXIF orientation if present.
-        # Imported lazily because it is only needed for inference.
-        from PIL import ImageOps
-
-        img = ImageOps.exif_transpose(img)
-
-        # Downsample BEFORE RGB conversion.
-        #
-        # Example:
-        # 4000x3000 -> approximately 384x288
-        # 8000x6000 -> approximately 384x288
-        #
-        # This dramatically reduces transient memory usage.
-        img.thumbnail(
-            (MAX_IMAGE_SIZE, MAX_IMAGE_SIZE),
-            Image.Resampling.LANCZOS,
+    if not MODEL_PATH.exists():
+        raise FileNotFoundError(
+            f"ONNX model not found: {MODEL_PATH}. "
+            "Place mobilenet_v3_small.onnx inside backend/models/."
         )
 
-        # Only now create the RGB image.
+    # Keep CPU thread usage low for Render Free.
+    session_options = ort.SessionOptions()
+
+    session_options.intra_op_num_threads = 1
+    session_options.inter_op_num_threads = 1
+
+    # Reduce unnecessary memory pressure.
+    session_options.enable_cpu_mem_arena = True
+    session_options.enable_mem_pattern = True
+
+    _SESSION = ort.InferenceSession(
+        str(MODEL_PATH),
+        sess_options=session_options,
+        providers=["CPUExecutionProvider"],
+    )
+
+    _INPUT_NAME = _SESSION.get_inputs()[0].name
+    _OUTPUT_NAME = _SESSION.get_outputs()[0].name
+
+    return _SESSION, _INPUT_NAME, _OUTPUT_NAME
+
+
+# ============================================================
+# IMAGE PREPROCESSING
+# ============================================================
+
+def _preprocess_image(image_bytes: bytes) -> np.ndarray:
+    """
+    Converts uploaded image into MobileNetV3 input.
+
+    Memory-safe strategy:
+    1. Open image.
+    2. Apply EXIF orientation.
+    3. Resize BEFORE creating a large RGB copy.
+    4. Convert to RGB.
+    5. Resize/crop to 224x224.
+    6. Normalize.
+    7. Convert to NCHW float32.
+
+    Returns:
+        numpy array with shape (1, 3, 224, 224)
+    """
+
+    with Image.open(io.BytesIO(image_bytes)) as original:
+
+        # Correct phone-camera orientation.
+        img = ImageOps.exif_transpose(original)
+
+        # Prevent huge camera images from creating huge RGB
+        # allocations.
+        img.thumbnail(
+            (384, 384),
+            Image.Resampling.BILINEAR,
+        )
+
+        # Now convert the much smaller image to RGB.
         img = img.convert("RGB")
 
-        return img
+        # Official MobileNetV3 preprocessing:
+        # resize to 256 and center crop 224.
+        img = img.resize(
+            (256, 256),
+            Image.Resampling.BILINEAR,
+        )
 
-    finally:
-        image_stream.close()
+        left = (256 - INPUT_SIZE) // 2
+        top = (256 - INPUT_SIZE) // 2
+        right = left + INPUT_SIZE
+        bottom = top + INPUT_SIZE
 
+        img = img.crop(
+            (left, top, right, bottom)
+        )
+
+        # Convert directly to float32 NumPy.
+        array = np.asarray(
+            img,
+            dtype=np.float32,
+        )
+
+    # Scale [0,255] -> [0,1]
+    array /= 255.0
+
+    # ImageNet normalization.
+    array = (array - MEAN) / STD
+
+    # HWC -> CHW
+    array = np.transpose(
+        array,
+        (2, 0, 1),
+    )
+
+    # Add batch dimension.
+    array = np.expand_dims(
+        array,
+        axis=0,
+    ).astype(np.float32)
+
+    return array
+
+
+# ============================================================
+# SOFTMAX
+# ============================================================
+
+def _softmax(logits: np.ndarray) -> np.ndarray:
+    """
+    Numerically stable softmax.
+    """
+
+    logits = np.asarray(
+        logits,
+        dtype=np.float32,
+    )
+
+    logits = logits - np.max(logits)
+
+    exp_values = np.exp(logits)
+
+    return exp_values / np.sum(exp_values)
+
+
+# ============================================================
+# CLASS NAME CLEANUP
+# ============================================================
+
+def _clean_category_name(name: str) -> str:
+    """
+    Converts ImageNet-style labels into readable names.
+    """
+
+    return (
+        name
+        .replace("_", " ")
+        .replace(",", ", ")
+        .strip()
+        .title()
+    )
+
+
+# ============================================================
+# LOCAL SPECIES CLASSIFIER
+# ============================================================
 
 def run_local_species_classifier(
     image_bytes: bytes,
     target_group: str = "bird",
 ) -> List[Tuple[str, str, float]]:
     """
-    Executes local species classification using PyTorch ResNet50.
+    Executes lightweight ONNX MobileNetV3-Small inference.
+
+    Parameters
+    ----------
+    image_bytes:
+        Uploaded image bytes.
 
     target_group:
-        - "bird"
-        - "insect"
-        - "general"
+        "bird"
+        "insect"
+        "general"
 
-    Returns:
-        List of:
+    Returns
+    -------
+    List of:
         (scientific_name, common_name, confidence)
     """
 
-    model, transform, categories, torch = _load_model()
-
-    img = None
-    tensor = None
-    logits = None
-    probabilities = None
+    session = None
+    input_tensor = None
+    output = None
 
     try:
-        # ---------------------------------------------------------
-        # 1. Memory-safe image preparation
-        # ---------------------------------------------------------
-        img = _prepare_image(image_bytes)
+        # Load ONNX Runtime session lazily.
+        session, input_name, output_name = _load_model()
 
-        # ---------------------------------------------------------
-        # 2. Convert to model tensor
-        # ---------------------------------------------------------
-        tensor = transform(img).unsqueeze(0)
+        # Load ImageNet category labels.
+        categories = _load_categories()
 
-        # ---------------------------------------------------------
-        # 3. Memory-efficient inference
-        # ---------------------------------------------------------
-        with torch.inference_mode():
-            logits = model(tensor)[0]
+        # Memory-safe preprocessing.
+        input_tensor = _preprocess_image(
+            image_bytes
+        )
 
-        results: List[Tuple[str, str, float]] = []
+        # ONNX Runtime inference.
+        outputs = session.run(
+            [output_name],
+            {
+                input_name: input_tensor,
+            },
+        )
 
-        # =========================================================
+        output = outputs[0]
+
+        # Expected shape:
+        # (1, 1000)
+        logits = np.asarray(
+            output[0],
+            dtype=np.float32,
+        )
+
+        probabilities = _softmax(logits)
+
+        results = []
+
+        # ====================================================
         # BIRD
-        # =========================================================
+        # ====================================================
+
         if target_group == "bird":
 
-            bird_indices = BIRD_CLASS_INDICES
+            bird_probs = probabilities[
+                BIRD_CLASS_INDICES
+            ]
 
-            bird_logits = logits[bird_indices]
-
-            bird_sub_probs = torch.nn.functional.softmax(
-                bird_logits,
-                dim=0,
+            top_count = min(
+                5,
+                len(BIRD_CLASS_INDICES),
             )
 
-            topk_probs, topk_sub_idx = torch.topk(
-                bird_sub_probs,
-                min(5, len(bird_indices)),
-            )
+            top_positions = np.argsort(
+                bird_probs
+            )[::-1][:top_count]
 
-            for i in range(topk_probs.size(0)):
+            for position in top_positions:
 
-                cat_idx = bird_indices[
-                    topk_sub_idx[i].item()
+                category_index = BIRD_CLASS_INDICES[
+                    int(position)
                 ]
 
-                cat_name = categories[cat_idx]
-
                 score = float(
-                    topk_probs[i].item()
+                    bird_probs[position]
                 )
 
-                clean_name = (
-                    cat_name
-                    .replace("_", " ")
-                    .title()
+                category_name = categories[
+                    category_index
+                ]
+
+                clean_name = _clean_category_name(
+                    category_name
                 )
 
                 results.append(
@@ -227,88 +450,107 @@ def run_local_species_classifier(
                     )
                 )
 
-            return results
-
-        # =========================================================
+        # ====================================================
         # INSECT
-        # =========================================================
+        # ====================================================
+
         elif target_group == "insect":
 
-            insect_indices = INSECT_CLASS_INDICES
+            insect_probs = probabilities[
+                INSECT_CLASS_INDICES
+            ]
 
-            insect_logits = logits[insect_indices]
-
-            insect_sub_probs = torch.nn.functional.softmax(
-                insect_logits,
-                dim=0,
+            # Do not force a species prediction when the
+            # model has essentially no confidence.
+            max_insect_score = float(
+                np.max(insect_probs)
             )
 
-            topk_probs, topk_sub_idx = torch.topk(
-                insect_sub_probs,
-                min(5, len(insect_indices)),
+            # ImageNet MobileNet is only being used as a
+            # lightweight fallback. Very weak predictions
+            # should be treated as "unknown".
+            if max_insect_score < 0.01:
+                return []
+
+            top_count = min(
+                5,
+                len(INSECT_CLASS_INDICES),
             )
 
-            for i in range(topk_probs.size(0)):
+            top_positions = np.argsort(
+                insect_probs
+            )[::-1][:top_count]
+            for position in top_positions:
 
-                cat_idx = insect_indices[
-                    topk_sub_idx[i].item()
+                category_index = INSECT_CLASS_INDICES[
+                    int(position)
                 ]
 
                 score = float(
-                    topk_probs[i].item()
+                    insect_probs[position]
                 )
 
-                sci_name, com_name = (
+                mapped = (
                     INSECT_ARTHROPOD_TAXONOMY_MAP.get(
-                        cat_idx,
-                        (
-                            categories[cat_idx],
-                            categories[cat_idx]
-                            .replace("_", " ")
-                            .title(),
-                        ),
+                        category_index
                     )
                 )
 
+                if mapped is not None:
+                    scientific_name, common_name = mapped
+
+                else:
+                    fallback_name = categories[
+                        category_index
+                    ]
+
+                    scientific_name = (
+                        fallback_name
+                    )
+
+                    common_name = (
+                        _clean_category_name(
+                            fallback_name
+                        )
+                    )
+
                 results.append(
                     (
-                        sci_name,
-                        com_name,
+                        scientific_name,
+                        common_name,
                         score,
                     )
                 )
 
-            return results
-
-        # =========================================================
+        # ====================================================
         # GENERAL
-        # =========================================================
+        # ====================================================
+
         else:
 
-            probabilities = torch.nn.functional.softmax(
-                logits,
-                dim=0,
-            )
-
-            top5_prob, top5_catid = torch.topk(
-                probabilities,
+            top_count = min(
                 5,
+                len(probabilities),
             )
 
-            for i in range(top5_prob.size(0)):
+            top_indices = np.argsort(
+                probabilities
+            )[::-1][:top_count]
 
-                cat_idx = top5_catid[i].item()
-
-                cat_name = categories[cat_idx]
+            for category_index in top_indices:
 
                 score = float(
-                    top5_prob[i].item()
+                    probabilities[
+                        category_index
+                    ]
                 )
 
-                clean_name = (
-                    cat_name
-                    .replace("_", " ")
-                    .title()
+                category_name = categories[
+                    int(category_index)
+                ]
+
+                clean_name = _clean_category_name(
+                    category_name
                 )
 
                 results.append(
@@ -319,17 +561,12 @@ def run_local_species_classifier(
                     )
                 )
 
-            return results
+        return results
 
     finally:
-        # ---------------------------------------------------------
-        # Explicitly release request-specific objects.
-        # The model itself remains cached intentionally.
-        # ---------------------------------------------------------
 
-        del img
-        del tensor
-        del logits
+        # Release request-level arrays.
+        input_tensor = None
+        output = None
 
-        if probabilities is not None:
-            del probabilities
+        gc.collect()
