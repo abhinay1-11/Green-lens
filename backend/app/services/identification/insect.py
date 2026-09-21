@@ -145,7 +145,7 @@ class InsectProvider(IdentificationProvider):
             margin = best_bg_conf - best_insect_conf
 
             # Two-stage decision policy: Reject as non-insect ONLY when background is genuinely decisive
-            if best_bg_conf >= 0.75 and margin >= 0.20:
+            if best_bg_conf >= 0.85 and margin >= 0.30:
                 bg_name = bg_preds[0]["common_name"] if bg_preds else "Background"
                 return PredictionResponse(
                     success=False,
