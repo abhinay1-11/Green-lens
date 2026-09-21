@@ -28,7 +28,7 @@ class Settings(BaseSettings):
     BIRD_MIN_CONFIDENCE: float = 0.30
     BIRD_PROVIDER_API_KEY: str = ""
     
-    INSECT_IDENTIFICATION_PROVIDER: str = "local_ai"   # local_ai, bioclip, mock
+    INSECT_IDENTIFICATION_PROVIDER: str = "local_onnx"   # local_onnx, bioclip, mock
     INSECT_PROVIDER_API_KEY: str = ""
     
     # Hugging Face Token (optional)

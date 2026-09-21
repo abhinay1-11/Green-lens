@@ -79,7 +79,7 @@ async def predict_species(
     try:
         if result and getattr(result, "success", True) and getattr(result, "predictions", None):
             top_pred = result.predictions[0]
-            if top_pred and getattr(top_pred, "scientific_name", None):
+            if top_pred and getattr(top_pred, "taxonomic_rank", "species") == "species" and getattr(top_pred, "scientific_name", None):
                 common_name = top_pred.common_names[0] if (getattr(top_pred, "common_names", None) and len(top_pred.common_names) > 0) else None
                 profile = SpeciesEnrichmentService.get_species_profile(
                     scientific_name=top_pred.scientific_name,

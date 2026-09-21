@@ -13,7 +13,7 @@ services:
       - key: BIRD_IDENTIFICATION_PROVIDER
         value: local_onnx
       - key: INSECT_IDENTIFICATION_PROVIDER
-        value: local_ai
+        value: local_onnx
       - key: PLANTNET_API_KEY
         sync: false
       - key: CORS_ORIGINS

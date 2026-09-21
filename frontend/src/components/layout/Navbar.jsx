@@ -21,18 +21,16 @@ export default function Navbar({ providerStatus }) {
     }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
         <Link to="/" style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none' }}>
-          <div style={{
-            width: '38px',
-            height: '38px',
-            borderRadius: '10px',
-            background: 'linear-gradient(135deg, #10b981 0%, #06b6d4 100%)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            boxShadow: '0 0 15px rgba(16, 185, 129, 0.4)'
-          }}>
-            <Leaf size={22} color="#ffffff" />
-          </div>
+          <img
+            src="/logo.png"
+            alt="GreenLens Logo"
+            style={{
+              width: '38px',
+              height: '38px',
+              objectFit: 'contain',
+              filter: 'drop-shadow(0 0 8px rgba(16, 185, 129, 0.4))'
+            }}
+          />
           <div>
             <span style={{ fontSize: '1.25rem', fontWeight: 800, color: 'var(--text-main)', letterSpacing: '-0.03em' }}>
               Green<span style={{ color: 'var(--accent-primary)' }}>Lens</span>
