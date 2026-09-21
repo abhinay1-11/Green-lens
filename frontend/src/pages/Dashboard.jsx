@@ -22,12 +22,12 @@ export default function Dashboard() {
         style={{
           position: 'relative',
           borderRadius: 'var(--radius-lg)',
-          padding: '36px 40px',
+          padding: '28px 24px',
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          justify: 'space-between',
-          gap: '24px',
+          justifyContent: 'space-between',
+          gap: '20px',
           backgroundImage: `linear-gradient(135deg, rgba(6, 16, 20, 0.90) 0%, rgba(10, 24, 32, 0.94) 60%, rgba(15, 23, 42, 0.96) 100%), url('https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1600&q=80')`,
           backgroundSize: 'cover',
           backgroundPosition: 'center',
@@ -55,11 +55,11 @@ export default function Dashboard() {
             <span>GREENLENS AI BIODIVERSITY MONITOR</span>
           </div>
 
-          <h1 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.03em', lineHeight: 1.2 }}>
+          <h1 style={{ fontSize: 'clamp(1.6rem, 5vw, 2.4rem)', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.03em', lineHeight: 1.2 }}>
             AI Biodiversity Monitor
           </h1>
 
-          <p style={{ fontSize: '1rem', color: '#e2e8f0', lineHeight: 1.6, fontWeight: 500 }}>
+          <p style={{ fontSize: '0.95rem', color: '#e2e8f0', lineHeight: 1.6, fontWeight: 500 }}>
             Identify plants, birds and insects from images, explore species information, and build your biodiversity record.
           </p>
         </div>

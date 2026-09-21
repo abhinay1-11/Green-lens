@@ -697,7 +697,17 @@ export default function Observe() {
                           <img
                             src={previewUrls[0]}
                             alt="Uploaded observation"
-                            style={{ width: '100%', height: '240px', objectFit: 'cover', display: 'block' }}
+                            style={{
+                              width: '100%',
+                              maxHeight: '340px',
+                              minHeight: '200px',
+                              objectFit: 'contain',
+                              background: 'rgba(0, 0, 0, 0.4)',
+                              display: 'block'
+                            }}
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
                           />
                         ) : (
                           <div style={{ height: '200px', background: 'var(--bg-tertiary)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
@@ -871,8 +881,17 @@ export default function Observe() {
                         <img
                           src={img.url}
                           alt={`Reference ${idx + 1}`}
-                          style={{ width: '100%', height: '160px', objectFit: 'cover', borderRadius: 'var(--radius-sm)' }}
-                          onError={(e) => { e.target.style.display = 'none'; }}
+                          style={{
+                            width: '100%',
+                            height: '160px',
+                            objectFit: 'contain',
+                            background: 'rgba(0, 0, 0, 0.4)',
+                            borderRadius: 'var(--radius-sm)'
+                          }}
+                          onError={(e) => {
+                            e.currentTarget.onerror = null;
+                            e.currentTarget.style.display = 'none';
+                          }}
                         />
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                           <div><strong>Photo:</strong> {img.creator || 'Unknown'}</div>

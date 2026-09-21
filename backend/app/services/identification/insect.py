@@ -117,7 +117,32 @@ class InsectProvider(IdentificationProvider):
             if not raw_bytes:
                 raise ValueError("No image bytes available for inference.")
 
-            raw_preds = run_insect_species_classifier(raw_bytes, top_k=27)
+            try:
+                raw_preds = run_insect_species_classifier(raw_bytes, top_k=27)
+            except ValueError as ve:
+                ve_str = str(ve)
+                if "UNREADABLE_IMAGE" in ve_str:
+                    return PredictionResponse(
+                        success=False,
+                        category="insect",
+                        provider="insect_local_onnx",
+                        identification_status="IDENTIFICATION_UNAVAILABLE",
+                        predictions=[],
+                        is_mock=False,
+                        error=ErrorDetail(code="INVALID_IMAGE", message="Unable to read this image. Please upload a clearer photo.")
+                    )
+                elif "IMAGE_TOO_SMALL" in ve_str:
+                    return PredictionResponse(
+                        success=False,
+                        category="insect",
+                        provider="insect_local_onnx",
+                        identification_status="IDENTIFICATION_UNAVAILABLE",
+                        predictions=[],
+                        is_mock=False,
+                        error=ErrorDetail(code="IMAGE_TOO_SMALL", message="Image resolution is too low. Please upload a clearer image.")
+                    )
+                else:
+                    raise ve
 
             if not raw_preds:
                 return PredictionResponse(
@@ -144,7 +169,7 @@ class InsectProvider(IdentificationProvider):
             best_bg_conf = bg_preds[0]["confidence"] if bg_preds else 0.0
             margin = best_bg_conf - best_insect_conf
 
-            # Two-stage decision policy: Reject as non-insect ONLY when background is genuinely decisive
+            # Robust Two-Stage Decision Policy: Reject as non-insect ONLY when background is decisively dominant
             if best_bg_conf >= 0.85 and margin >= 0.30:
                 bg_name = bg_preds[0]["common_name"] if bg_preds else "Background"
                 return PredictionResponse(
@@ -165,13 +190,24 @@ class InsectProvider(IdentificationProvider):
 
             predictions = []
             for idx, item in enumerate(insect_preds[:5], start=1):
-                sci_name = item.get("scientific_name") or item.get("common_name")
+                raw_common = item.get("common_name", "")
+                raw_sci = item.get("scientific_name")
+                conf = float(item.get("confidence", 0.0))
+
+                # Safe taxonomy labeling: prevent fabricated species names on low-confidence or category-level predictions
+                if conf < 0.40 and (item.get("label") in ["fly_small", "other"] or not raw_sci):
+                    display_common = "Insect (Uncertain Match)"
+                    display_sci = raw_sci or "Insecta (Uncertain Taxon)"
+                else:
+                    display_common = raw_common or raw_sci or "Insect"
+                    display_sci = raw_sci or f"Insecta ({display_common})"
+
                 predictions.append(
                     PredictionItem(
                         rank=idx,
-                        scientific_name=sci_name,
-                        common_names=[item.get("common_name")],
-                        confidence=float(item.get("confidence", 0.0)),
+                        scientific_name=display_sci,
+                        common_names=[display_common],
+                        confidence=conf,
                         taxonomic_rank=item.get("taxonomic_rank", "category")
                     )
                 )
@@ -228,6 +264,7 @@ class InsectProvider(IdentificationProvider):
                 is_mock=False,
                 error=ErrorDetail(
                     code="INSECT_PROVIDER_UNAVAILABLE",
-                    message=f"Insect species classifier inference error: {str(exc)}"
+                    message=f"Insect species classifier error: {str(exc)}"
                 )
             )
+
