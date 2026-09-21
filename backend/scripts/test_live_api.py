@@ -40,7 +40,7 @@ body = res.json()
 assert res.status_code == 200
 assert body["success"] is True
 assert body["category"] == "bird"
-assert body["provider"] in ("BioCLIP 2", "legacy_bird_ai")
+assert body["provider"] in ("BioCLIP 2", "legacy_bird_ai", "bird_local_ai")
 
 print("\n" + "=" * 70)
 print("ALL LIVE API ENDPOINT VERIFICATIONS PASSED SUCCESSFULLY!")
