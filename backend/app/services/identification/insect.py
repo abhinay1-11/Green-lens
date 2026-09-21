@@ -168,6 +168,9 @@ class InsectProvider(IdentificationProvider):
                 provider="insect_local_ai",
                 model_name="MobileNetV3-Small Insect Classifier",
                 model_version="v1.0",
+                identification_status=ident_status,
+                predictions=predictions,
+                is_mock=False,
             )
 
         except Exception as exc:
