@@ -4,15 +4,15 @@ from typing import List, Optional, Dict, Any
 from app.config import settings
 from app.services.identification.base import IdentificationProvider
 from app.services.identification.mock import MockProvider
-from app.services.identification.local_model import run_local_species_classifier
+from app.services.identification.bird_model import run_bird_species_classifier
 from app.schemas.identification import PredictionResponse, PredictionItem, ErrorDetail
 from app.utils.confidence import normalize_confidence
 
 
 class LegacyBirdProvider(IdentificationProvider):
     """
-    Legacy Bird Species Identification Provider (PyTorch local classifier fallback).
-    Preserved behind configuration flag for legacy system compatibility.
+    Lightweight Bird Species Identification Provider (ONNX CPU Classifier).
+    Uses 525-species bird-specific ONNX model for high-accuracy local bird recognition.
     """
 
     def identify(
@@ -25,7 +25,7 @@ class LegacyBirdProvider(IdentificationProvider):
             return PredictionResponse(
                 success=False,
                 category="bird",
-                provider="legacy_bird_ai",
+                provider="bird_local_ai",
                 identification_status="IDENTIFICATION_UNAVAILABLE",
                 predictions=[],
                 error=ErrorDetail(code="INVALID_IMAGE", message="No valid bird image provided.")
@@ -40,14 +40,14 @@ class LegacyBirdProvider(IdentificationProvider):
             return PredictionResponse(
                 success=False,
                 category="bird",
-                provider="legacy_bird_ai",
+                provider="bird_local_ai",
                 identification_status="IDENTIFICATION_UNAVAILABLE",
                 predictions=[],
                 error=ErrorDetail(code="INVALID_IMAGE", message="No valid bird image provided.")
             )
 
         try:
-            raw_predictions = run_local_species_classifier(raw_bytes, target_group="bird")
+            raw_predictions = run_bird_species_classifier(raw_bytes)
 
             predictions = []
             for idx, (sci_name, common_name, score) in enumerate(raw_predictions, start=1):
@@ -69,8 +69,8 @@ class LegacyBirdProvider(IdentificationProvider):
                 success=True,
                 category="bird",
                 detected_category="bird",
-                provider="legacy_bird_ai",
-                model_name="PyTorch Avian Vision Classifier (Legacy)",
+                provider="bird_local_ai",
+                model_name="Bird Species ONNX Classifier",
                 model_version="v1.0",
                 identification_status=ident_status,
                 predictions=predictions,
@@ -78,17 +78,17 @@ class LegacyBirdProvider(IdentificationProvider):
             )
 
         except Exception as exc:
-            print(f"Legacy bird classifier error: {exc}")
+            print(f"Bird ONNX classifier error: {exc}")
             return PredictionResponse(
                 success=False,
                 category="bird",
-                provider="legacy_bird_ai",
+                provider="bird_local_ai",
                 identification_status="IDENTIFICATION_UNAVAILABLE",
                 predictions=[],
                 is_mock=False,
                 error=ErrorDetail(
                     code="BIRD_PROVIDER_UNAVAILABLE",
-                    message=f"Legacy bird classifier inference error: {str(exc)}"
+                    message=f"Bird species classifier inference error: {str(exc)}"
                 )
             )
 
@@ -96,8 +96,8 @@ class LegacyBirdProvider(IdentificationProvider):
 class BirdProvider(IdentificationProvider):
     """
     Main Bird Identification Provider Router.
-    Routes inference requests to BioCLIPBirdProvider (BioCLIP 2) when configured,
-    or LegacyBirdProvider / MockProvider based on settings.
+    Routes inference requests to Bird Species ONNX Classifier by default,
+    or BioCLIPBirdProvider / MockProvider based on settings.
     """
 
     def __init__(self, api_key: Optional[str] = None):
@@ -116,19 +116,16 @@ class BirdProvider(IdentificationProvider):
             res.detected_category = "bird"
             return res
 
-        provider_choice = getattr(settings, "BIRD_IDENTIFICATION_PROVIDER", "legacy_pytorch").lower()
+        provider_choice = getattr(settings, "BIRD_IDENTIFICATION_PROVIDER", "local_onnx").lower()
 
-        if provider_choice in ("legacy_pytorch", "local_ai", "legacy", "pytorch"):
-            print("[IDENTIFY] Category: bird")
-            print("[IDENTIFY] Provider: LegacyBirdProvider")
-            return self.legacy_provider.identify(images, category=category, location=location)
-        elif provider_choice == "bioclip":
+        if provider_choice == "bioclip":
             print("[IDENTIFY] Category: bird")
             print("[IDENTIFY] Provider: BioCLIPBirdProvider")
             from app.services.identification.bioclip import BioCLIPBirdProvider
             return BioCLIPBirdProvider().identify(images, category=category, location=location)
         else:
             print("[IDENTIFY] Category: bird")
-            print("[IDENTIFY] Provider: LegacyBirdProvider")
+            print("[IDENTIFY] Provider: LegacyBirdProvider (ONNX)")
             return self.legacy_provider.identify(images, category=category, location=location)
+
 

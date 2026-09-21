@@ -113,20 +113,6 @@ def _load_categories():
 
 
 # ============================================================
-# BIRD CLASS INDICES
-# ============================================================
-
-# Existing GreenLens ImageNet bird class selection.
-BIRD_CLASS_INDICES = sorted(
-    list(
-        set(range(8, 25))
-        | set(range(80, 101))
-        | set(range(127, 147))
-    )
-)
-
-
-# ============================================================
 # INSECT / ARTHROPOD TAXONOMY
 # ============================================================
 
@@ -406,55 +392,10 @@ def run_local_species_classifier(
         results = []
 
         # ====================================================
-        # BIRD
-        # ====================================================
-
-        if target_group == "bird":
-
-            bird_probs = probabilities[
-                BIRD_CLASS_INDICES
-            ]
-
-            top_count = min(
-                5,
-                len(BIRD_CLASS_INDICES),
-            )
-
-            top_positions = np.argsort(
-                bird_probs
-            )[::-1][:top_count]
-
-            for position in top_positions:
-
-                category_index = BIRD_CLASS_INDICES[
-                    int(position)
-                ]
-
-                score = float(
-                    bird_probs[position]
-                )
-
-                category_name = categories[
-                    category_index
-                ]
-
-                clean_name = _clean_category_name(
-                    category_name
-                )
-
-                results.append(
-                    (
-                        clean_name,
-                        clean_name,
-                        score,
-                    )
-                )
-
-        # ====================================================
         # INSECT
         # ====================================================
 
-        elif target_group == "insect":
+        if target_group == "insect":
 
             insect_probs = probabilities[
                 INSECT_CLASS_INDICES

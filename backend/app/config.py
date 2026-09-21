@@ -24,7 +24,7 @@ class Settings(BaseSettings):
     PLANT_IDENTIFICATION_PROVIDER: str = "plantnet" # plantnet, mock
     PLANTNET_API_KEY: str = ""
     
-    BIRD_IDENTIFICATION_PROVIDER: str = "legacy_pytorch"   # legacy_pytorch, bioclip, mock
+    BIRD_IDENTIFICATION_PROVIDER: str = "local_onnx"   # local_onnx, bioclip, mock
     BIRD_MIN_CONFIDENCE: float = 0.30
     BIRD_PROVIDER_API_KEY: str = ""
     

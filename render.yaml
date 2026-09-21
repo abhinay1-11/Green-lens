@@ -11,7 +11,7 @@ services:
       - key: BIRD_MIN_CONFIDENCE
         value: "0.30"
       - key: BIRD_IDENTIFICATION_PROVIDER
-        value: legacy_pytorch
+        value: local_onnx
       - key: INSECT_IDENTIFICATION_PROVIDER
         value: local_ai
       - key: PLANTNET_API_KEY
