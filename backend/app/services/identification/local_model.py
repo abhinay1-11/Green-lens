@@ -469,17 +469,13 @@ def run_local_species_classifier(
             # ImageNet MobileNet is only being used as a
             # lightweight fallback. Very weak predictions
             # should be treated as "unknown".
-            if max_insect_score < 0.01:
+            if max_insect_score < 0.20:
                 return []
 
-            top_count = min(
-                5,
-                len(INSECT_CLASS_INDICES),
-            )
+            top_position = int(np.argmax(insect_probs))
 
-            top_positions = np.argsort(
-                insect_probs
-            )[::-1][:top_count]
+            top_positions = [top_position]
+
             for position in top_positions:
 
                 category_index = INSECT_CLASS_INDICES[
