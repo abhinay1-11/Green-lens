@@ -63,7 +63,16 @@ class LegacyBirdProvider(IdentificationProvider):
                 )
 
             top_score = predictions[0].confidence if predictions else 0.0
-            ident_status = "HIGH_CONFIDENCE" if top_score >= 0.80 else ("MEDIUM_CONFIDENCE" if top_score >= 0.50 else "LOW_CONFIDENCE")
+            top2_score = predictions[1].confidence if len(predictions) > 1 else 0.0
+
+            if top_score >= 0.70:
+                ident_status = "HIGH_CONFIDENCE"
+            elif len(predictions) > 1 and (top_score - top2_score) < 0.10 and top_score < 0.70:
+                ident_status = "AMBIGUOUS"
+            elif top_score >= 0.40:
+                ident_status = "MEDIUM_CONFIDENCE"
+            else:
+                ident_status = "LOW_CONFIDENCE"
 
             return PredictionResponse(
                 success=True,

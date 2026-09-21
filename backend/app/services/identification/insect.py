@@ -89,7 +89,7 @@ class InsectProvider(IdentificationProvider):
 
                     if predictions:
                         top_score = predictions[0].confidence
-                        ident_status = "HIGH_CONFIDENCE" if top_score >= 0.80 else ("MEDIUM_CONFIDENCE" if top_score >= 0.50 else "LOW_CONFIDENCE")
+                        ident_status = "HIGH_CONFIDENCE" if top_score >= 0.70 else ("MEDIUM_CONFIDENCE" if top_score >= 0.40 else "LOW_CONFIDENCE")
                         return PredictionResponse(
                             success=True,
                             category="insect",
@@ -117,7 +117,7 @@ class InsectProvider(IdentificationProvider):
             if not raw_bytes:
                 raise ValueError("No image bytes available for inference.")
 
-            raw_preds = run_insect_species_classifier(raw_bytes, top_k=5)
+            raw_preds = run_insect_species_classifier(raw_bytes, top_k=27)
 
             if not raw_preds:
                 return PredictionResponse(
@@ -136,9 +136,17 @@ class InsectProvider(IdentificationProvider):
                     )
                 )
 
-            top_pred = raw_preds[0]
-            # Handle non-insect background predictions
-            if top_pred.get("is_non_insect") or top_pred.get("taxonomic_rank") == "non_insect":
+            bg_indices = {20, 21, 22, 23}
+            insect_preds = [p for p in raw_preds if p.get("index") not in bg_indices and not p.get("is_non_insect")]
+            bg_preds = [p for p in raw_preds if p.get("index") in bg_indices or p.get("is_non_insect")]
+
+            best_insect_conf = insect_preds[0]["confidence"] if insect_preds else 0.0
+            best_bg_conf = bg_preds[0]["confidence"] if bg_preds else 0.0
+            margin = best_bg_conf - best_insect_conf
+
+            # Two-stage decision policy: Reject as non-insect ONLY when background is genuinely decisive
+            if best_bg_conf >= 0.75 and margin >= 0.20:
+                bg_name = bg_preds[0]["common_name"] if bg_preds else "Background"
                 return PredictionResponse(
                     success=False,
                     category="insect",
@@ -151,15 +159,12 @@ class InsectProvider(IdentificationProvider):
                     is_mock=False,
                     error=ErrorDetail(
                         code="NO_INSECT_DETECTED",
-                        message=f"Image classified as non-insect background ({top_pred.get('common_name')})."
+                        message=f"Image classified as non-insect background ({bg_name})."
                     )
                 )
 
             predictions = []
-            for idx, item in enumerate(raw_preds, start=1):
-                if item.get("is_non_insect") or item.get("taxonomic_rank") == "non_insect":
-                    continue
-
+            for idx, item in enumerate(insect_preds[:5], start=1):
                 sci_name = item.get("scientific_name") or item.get("common_name")
                 predictions.append(
                     PredictionItem(
@@ -189,7 +194,16 @@ class InsectProvider(IdentificationProvider):
                 )
 
             top_score = predictions[0].confidence
-            ident_status = "HIGH_CONFIDENCE" if top_score >= 0.80 else ("MEDIUM_CONFIDENCE" if top_score >= 0.50 else "LOW_CONFIDENCE")
+            top2_score = predictions[1].confidence if len(predictions) > 1 else 0.0
+
+            if top_score >= 0.70:
+                ident_status = "HIGH_CONFIDENCE"
+            elif len(predictions) > 1 and (top_score - top2_score) < 0.10 and top_score < 0.70:
+                ident_status = "AMBIGUOUS"
+            elif top_score >= 0.40:
+                ident_status = "MEDIUM_CONFIDENCE"
+            else:
+                ident_status = "LOW_CONFIDENCE"
 
             return PredictionResponse(
                 success=True,

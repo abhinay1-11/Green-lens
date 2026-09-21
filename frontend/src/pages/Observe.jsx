@@ -666,10 +666,10 @@ export default function Observe() {
                   }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <span className="badge" style={{ padding: '6px 12px', fontSize: '0.8rem', background: currentTheme.bgColor, color: currentTheme.accentColor, border: `1px solid ${currentTheme.borderColor}` }}>
-                        {category === 'bird' ? 'BioCLIP 2 Avian Engine' : category === 'plant' ? 'Pl@ntNet API' : 'Insecta Vision AI'}
+                        {predictionResponse?.provider === 'bird_local_ai' ? 'Bird Species ONNX Engine' : predictionResponse?.provider === 'insect_local_onnx' ? 'Insect EfficientNet-B0 ONNX Engine' : predictionResponse?.provider || (category === 'bird' ? 'Bird Species ONNX Engine' : category === 'plant' ? 'Pl@ntNet API' : 'Insecta Vision AI')}
                       </span>
                       <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                        Model: {predictionResponse?.model_name || 'BioCLIP 2'}
+                        Model: {predictionResponse?.model_name || 'Species Classifier'}
                       </span>
                     </div>
 
@@ -729,7 +729,11 @@ export default function Observe() {
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                       <div>
                         <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: currentTheme.accentColor, fontWeight: 800, letterSpacing: '0.08em' }}>
-                          Primary Species Identification
+                          {predictionResponse?.identification_status === 'LOW_CONFIDENCE'
+                            ? 'Possible Species Identification (Low Confidence)'
+                            : predictionResponse?.identification_status === 'AMBIGUOUS'
+                            ? 'Ambiguous Species Identification'
+                            : 'Primary Species Identification'}
                         </span>
                         <h1 style={{ fontSize: '2.4rem', fontWeight: 800, color: '#ffffff', margin: '4px 0 2px 0', lineHeight: 1.15 }}>
                           {topPrediction.common_names?.[0] || topPrediction.scientific_name}
@@ -756,8 +760,8 @@ export default function Observe() {
                             {(topPrediction.confidence > 1 ? topPrediction.confidence : topPrediction.confidence * 100).toFixed(1)}%
                           </div>
                           <div>
-                            <span className="badge badge-confirmed">
-                              {predictionResponse?.identification_status}
+                            <span className={`badge ${predictionResponse?.identification_status === 'HIGH_CONFIDENCE' ? 'badge-confirmed' : predictionResponse?.identification_status === 'MEDIUM_CONFIDENCE' ? 'badge-medium' : 'badge-low'}`}>
+                              {predictionResponse?.identification_status === 'HIGH_CONFIDENCE' ? 'High Confidence' : predictionResponse?.identification_status === 'MEDIUM_CONFIDENCE' ? 'Medium Confidence' : predictionResponse?.identification_status === 'AMBIGUOUS' ? 'Ambiguous Match' : 'Possible Match'}
                             </span>
                           </div>
                         </div>
