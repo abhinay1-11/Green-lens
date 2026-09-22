@@ -234,12 +234,12 @@ class InsectProvider(IdentificationProvider):
 
             if top_score >= 0.70:
                 ident_status = "HIGH_CONFIDENCE"
-            elif len(predictions) > 1 and (top_score - top2_score) < 0.10 and top_score < 0.70:
-                ident_status = "AMBIGUOUS"
-            elif top_score >= 0.40:
-                ident_status = "MEDIUM_CONFIDENCE"
-            else:
+            elif top_score < 0.40:
                 ident_status = "LOW_CONFIDENCE"
+            elif len(predictions) > 1 and (top_score - top2_score) < 0.10:
+                ident_status = "AMBIGUOUS"
+            else:
+                ident_status = "MEDIUM_CONFIDENCE"
 
             return PredictionResponse(
                 success=True,

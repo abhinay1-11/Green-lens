@@ -68,6 +68,7 @@ def preprocess_insect_image(image_bytes: bytes, target_size: int = 128) -> np.nd
     """
     Validates, converts to RGB, and letterboxes input image to target_size x target_size
     preserving exact aspect ratio without organism distortion.
+    Outputs float32 tensor in range [0.0, 255.0] expected by insect_species.onnx.
     """
     try:
         image = Image.open(io.BytesIO(image_bytes))
@@ -95,10 +96,12 @@ def preprocess_insect_image(image_bytes: bytes, target_size: int = 128) -> np.nd
     pad_y = (target_size - new_h) // 2
     padded.paste(resized, (pad_x, pad_y))
 
-    img_np = np.array(padded, dtype=np.float32) / 255.0
+    # Raw pixel float32 array in [0.0, 255.0] range expected by ONNX model
+    img_np = np.array(padded, dtype=np.float32)
     img_np = np.transpose(img_np, (2, 0, 1))  # HWC -> CHW [3, 128, 128]
     img_np = np.expand_dims(img_np, axis=0)     # Batch dim [1, 3, 128, 128]
     return img_np
+
 
 
 def run_insect_species_classifier(image_bytes: bytes, top_k: int = 5) -> List[Dict[str, Any]]:
