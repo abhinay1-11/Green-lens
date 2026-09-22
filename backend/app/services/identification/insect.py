@@ -5,7 +5,7 @@ from typing import List, Optional, Dict, Any
 from app.config import settings
 from app.services.identification.base import IdentificationProvider
 from app.services.identification.mock import MockProvider
-from app.services.identification.insect_model import run_insect_species_classifier
+from app.services.identification.local_model import run_local_species_classifier
 from app.schemas.identification import PredictionResponse, PredictionItem, ErrorDetail
 from app.utils.confidence import normalize_confidence
 
@@ -13,7 +13,7 @@ from app.utils.confidence import normalize_confidence
 class InsectProvider(IdentificationProvider):
     """
     Insect & Arthropod Identification Provider.
-    Uses dedicated Insect EfficientNet-B0 ONNX Classifier by default for low-memory Render CPU deployment.
+    Primary Engine: MobileNetV3-Small ImageNet ONNX Classifier.
     Optional BioCLIP 2 TreeOfLifeClassifier when explicitly configured.
     """
 
@@ -36,13 +36,13 @@ class InsectProvider(IdentificationProvider):
             return PredictionResponse(
                 success=False,
                 category="insect",
-                provider="insect_local_onnx",
+                provider="insect_local_ai",
                 identification_status="IDENTIFICATION_UNAVAILABLE",
                 predictions=[],
                 error=ErrorDetail(code="INVALID_IMAGE", message="No valid insect image provided.")
             )
 
-        provider_choice = getattr(settings, "INSECT_IDENTIFICATION_PROVIDER", "local_onnx").lower()
+        provider_choice = getattr(settings, "INSECT_IDENTIFICATION_PROVIDER", "local_ai").lower()
 
         # 1. BioCLIP 2 Insecta Vision Engine (only if explicitly configured as bioclip)
         if provider_choice == "bioclip":
@@ -103,11 +103,11 @@ class InsectProvider(IdentificationProvider):
                         )
 
             except Exception as bio_err:
-                print(f"[InsectProvider] BioCLIP 2 engine unavailable, using fast local ONNX fallback: {bio_err}")
+                print(f"[InsectProvider] BioCLIP 2 engine unavailable, using fast local fallback: {bio_err}")
 
-        # 2. Dedicated Insect EfficientNet-B0 ONNX Classifier (default for free tier)
+        # 2. MobileNetV3-Small ImageNet ONNX Classifier (restored GreenLens insect classifier)
         print("[IDENTIFY] Category: insect")
-        print("[IDENTIFY] Provider: Insect EfficientNet-B0 ONNX Classifier")
+        print("INSECT MODEL: MobileNetV3-Small ImageNet")
         try:
             raw_bytes = images[0].get("file_bytes")
             if not raw_bytes and images[0].get("saved_path") and os.path.exists(images[0]["saved_path"]):
@@ -118,14 +118,14 @@ class InsectProvider(IdentificationProvider):
                 raise ValueError("No image bytes available for inference.")
 
             try:
-                raw_preds = run_insect_species_classifier(raw_bytes, top_k=27)
+                raw_predictions = run_local_species_classifier(raw_bytes, target_group="insect")
             except ValueError as ve:
                 ve_str = str(ve)
                 if "UNREADABLE_IMAGE" in ve_str:
                     return PredictionResponse(
                         success=False,
                         category="insect",
-                        provider="insect_local_onnx",
+                        provider="insect_local_ai",
                         identification_status="IDENTIFICATION_UNAVAILABLE",
                         predictions=[],
                         is_mock=False,
@@ -135,7 +135,7 @@ class InsectProvider(IdentificationProvider):
                     return PredictionResponse(
                         success=False,
                         category="insect",
-                        provider="insect_local_onnx",
+                        provider="insect_local_ai",
                         identification_status="IDENTIFICATION_UNAVAILABLE",
                         predictions=[],
                         is_mock=False,
@@ -144,13 +144,13 @@ class InsectProvider(IdentificationProvider):
                 else:
                     raise ve
 
-            if not raw_preds:
+            if not raw_predictions:
                 return PredictionResponse(
                     success=False,
                     category="insect",
                     detected_category="insect",
-                    provider="insect_local_onnx",
-                    model_name="Insect EfficientNet-B0 ONNX Classifier",
+                    provider="insect_local_ai",
+                    model_name="MobileNetV3-Small ImageNet",
                     model_version="v1.0",
                     identification_status="IDENTIFICATION_UNAVAILABLE",
                     predictions=[],
@@ -161,75 +161,20 @@ class InsectProvider(IdentificationProvider):
                     )
                 )
 
-            bg_indices = {20, 21, 22, 23}
-            insect_preds = [p for p in raw_preds if p.get("index") not in bg_indices and not p.get("is_non_insect")]
-            bg_preds = [p for p in raw_preds if p.get("index") in bg_indices or p.get("is_non_insect")]
-
-            best_insect_conf = insect_preds[0]["confidence"] if insect_preds else 0.0
-            best_bg_conf = bg_preds[0]["confidence"] if bg_preds else 0.0
-            margin = best_bg_conf - best_insect_conf
-
-            # Robust Two-Stage Decision Policy: Reject as non-insect ONLY when background is decisively dominant
-            if best_bg_conf >= 0.85 and margin >= 0.30:
-                bg_name = bg_preds[0]["common_name"] if bg_preds else "Background"
-                return PredictionResponse(
-                    success=False,
-                    category="insect",
-                    detected_category="insect",
-                    provider="insect_local_onnx",
-                    model_name="Insect EfficientNet-B0 ONNX Classifier",
-                    model_version="v1.0",
-                    identification_status="IDENTIFICATION_UNAVAILABLE",
-                    predictions=[],
-                    is_mock=False,
-                    error=ErrorDetail(
-                        code="NO_INSECT_DETECTED",
-                        message=f"Image classified as non-insect background ({bg_name})."
-                    )
-                )
-
             predictions = []
-            for idx, item in enumerate(insect_preds[:5], start=1):
-                raw_common = item.get("common_name", "")
-                raw_sci = item.get("scientific_name")
-                conf = float(item.get("confidence", 0.0))
-
-                # Safe taxonomy labeling: prevent fabricated species names on low-confidence or category-level predictions
-                if conf < 0.40 and (item.get("label") in ["fly_small", "other"] or not raw_sci):
-                    display_common = "Insect (Uncertain Match)"
-                    display_sci = raw_sci or "Insecta (Uncertain Taxon)"
-                else:
-                    display_common = raw_common or raw_sci or "Insect"
-                    display_sci = raw_sci or f"Insecta ({display_common})"
-
+            for idx, (sci_name, common_name, score) in enumerate(raw_predictions[:5], start=1):
+                norm_score = normalize_confidence(score)
                 predictions.append(
                     PredictionItem(
                         rank=idx,
-                        scientific_name=display_sci,
-                        common_names=[display_common],
-                        confidence=conf,
-                        taxonomic_rank=item.get("taxonomic_rank", "category")
+                        scientific_name=sci_name,
+                        common_names=[common_name],
+                        confidence=norm_score,
+                        taxonomic_rank="species"
                     )
                 )
 
-            if not predictions:
-                return PredictionResponse(
-                    success=False,
-                    category="insect",
-                    detected_category="insect",
-                    provider="insect_local_onnx",
-                    model_name="Insect EfficientNet-B0 ONNX Classifier",
-                    model_version="v1.0",
-                    identification_status="IDENTIFICATION_UNAVAILABLE",
-                    predictions=[],
-                    is_mock=False,
-                    error=ErrorDetail(
-                        code="NO_INSECT_DETECTED",
-                        message="No insect targets detected in image."
-                    )
-                )
-
-            top_score = predictions[0].confidence
+            top_score = predictions[0].confidence if predictions else 0.0
             top2_score = predictions[1].confidence if len(predictions) > 1 else 0.0
 
             if top_score >= 0.70:
@@ -245,20 +190,20 @@ class InsectProvider(IdentificationProvider):
                 success=True,
                 category="insect",
                 detected_category="insect",
-                provider="insect_local_onnx",
-                model_name="Insect EfficientNet-B0 ONNX Classifier",
+                provider="insect_local_ai",
+                model_name="MobileNetV3-Small ImageNet",
                 model_version="v1.0",
                 identification_status=ident_status,
                 predictions=predictions,
-                is_mock=False,
+                is_mock=False
             )
 
         except Exception as exc:
-            print(f"Insect ONNX classifier error: {exc}")
+            print(f"Insect MobileNetV3 classifier error: {exc}")
             return PredictionResponse(
                 success=False,
                 category="insect",
-                provider="insect_local_onnx",
+                provider="insect_local_ai",
                 identification_status="IDENTIFICATION_UNAVAILABLE",
                 predictions=[],
                 is_mock=False,
@@ -267,4 +212,5 @@ class InsectProvider(IdentificationProvider):
                     message=f"Insect species classifier error: {str(exc)}"
                 )
             )
+
 
