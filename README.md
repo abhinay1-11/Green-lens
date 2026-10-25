@@ -9,21 +9,21 @@ Identify birds, plants and insects from a photo, log sightings with their locati
 <table>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/identify.png" alt="Species identification result" width="400"><br>
+      <img src="screenshots/identify.png" alt="Species identification result" width="400"><br>
       <b>Identify from a photo</b>
     </td>
     <td align="center">
-      <img src="docs/screenshots/explorer.png" alt="Species Explorer search" width="400"><br>
+      <img src="screenshots/explorer.png" alt="Species Explorer search" width="400"><br>
       <b>Search species worldwide</b>
     </td>
   </tr>
   <tr>
     <td align="center">
-      <img src="docs/screenshots/observations.png" alt="Observation log with locations" width="400"><br>
+      <img src="screenshots/observations.png" alt="Observation log with locations" width="400"><br>
       <b>Log observations</b>
     </td>
     <td align="center">
-      <img src="docs/screenshots/report.png" alt="Exported PDF report" width="400"><br>
+      <img src="screenshots/report.png" alt="Exported PDF report" width="400"><br>
       <b>Export reports</b>
     </td>
   </tr>
