@@ -4,8 +4,11 @@ Identify birds, plants and insects from a photo, log sightings with their locati
 
 **[Live demo](https://green-lens-five.vercel.app)** · React · FastAPI · BioCLIP 2 · Docker
 
-![Identification result](docs/screenshots/identify.png)
-![Species explorer](docs/screenshots/explorer.png)
+## 📚 Documentation
+- [Architecture](docs/ARCHITECTURE.md)
+- [API reference](docs/API.md)
+- [Model providers](docs/MODEL_PROVIDERS.md)
+- [Setup guide](docs/SETUP.md)
 
 ## What it does
 - **Identify from photos:** birds (BioCLIP 2), plants (Pl@ntNet) and insects (insect-vision engine)
