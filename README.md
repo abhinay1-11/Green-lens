@@ -18,7 +18,6 @@ React (frontend) · FastAPI + SQLite (backend) · BioCLIP 2, Pl@ntNet API · Doc
 
 ## Known limitations
 - Insect identification is the least accurate module and is still being improved.
-- [One line on how the app handles low-confidence results]
 ## 🌟 Key Features
 
 * **Multi-Domain AI Classification**:
