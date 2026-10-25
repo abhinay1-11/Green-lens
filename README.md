@@ -1,9 +1,35 @@
-# 🌿 GreenLens: AI Biodiversity Monitor
+# GreenLens: AI Biodiversity Monitor
 
 Identify birds, plants and insects from a photo, log sightings with their location, and turn them into reports.
 
 **[Live demo](https://green-lens-five.vercel.app)** · React · FastAPI · BioCLIP 2 · Docker
 
+## 📸 Screenshots
+
+<table>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/identify.png" alt="Species identification result" width="400"><br>
+      <b>Identify from a photo</b>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/explorer.png" alt="Species Explorer search" width="400"><br>
+      <b>Search species worldwide</b>
+    </td>
+  </tr>
+  <tr>
+    <td align="center">
+      <img src="docs/screenshots/observations.png" alt="Observation log with locations" width="400"><br>
+      <b>Log observations</b>
+    </td>
+    <td align="center">
+      <img src="docs/screenshots/report.png" alt="Exported PDF report" width="400"><br>
+      <b>Export reports</b>
+    </td>
+  </tr>
+</table>
+
+GreenLens is an AI-powered biodiversity monitoring web app for ecological surveys and wildlife identification. It classifies birds, plants and insects, and enriches each result with taxonomy, quick facts, field notes and digital collection books.
 ## 📚 Documentation
 - [Architecture](docs/ARCHITECTURE.md)
 - [API reference](docs/API.md)
