@@ -18,17 +18,19 @@ export default function Dashboard() {
       
       {/* 1. PROFESSIONAL BIODIVERSITY HERO SECTION WITH OVERLAY & ACCESSIBLE CONTRAST */}
       <div 
-        className="glass-panel"
+        className="glass-panel hero-section"
         style={{
           position: 'relative',
           borderRadius: 'var(--radius-lg)',
-          padding: '28px 24px',
+          padding: '56px 48px',
+            minHeight: '340px',
+            backgroundImage: `linear-gradient(to right, rgba(6, 16, 20, 0.75) 0%, rgba(6, 16, 20, 0.15) 100%), url('https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1600&q=80')`,
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
           justifyContent: 'space-between',
           gap: '20px',
-          backgroundImage: `linear-gradient(135deg, rgba(6, 16, 20, 0.90) 0%, rgba(10, 24, 32, 0.94) 60%, rgba(15, 23, 42, 0.96) 100%), url('https://images.unsplash.com/photo-1448375240586-882707db888b?auto=format&fit=crop&w=1600&q=80')`,
+          
           backgroundSize: 'cover',
           backgroundPosition: 'center',
           boxShadow: 'var(--shadow-lg)',
@@ -55,11 +57,11 @@ export default function Dashboard() {
             <span>GREENLENS AI BIODIVERSITY MONITOR</span>
           </div>
 
-          <h1 style={{ fontSize: 'clamp(1.6rem, 5vw, 2.4rem)', fontWeight: 800, color: '#ffffff', letterSpacing: '-0.03em', lineHeight: 1.2 }}>
+          <h1 style={{ fontSize: 'clamp(1.6rem, 5vw, 2.4rem)', fontWeight: 800, textShadow: '0 1px 3px rgba(0,0,0,0.6)', letterSpacing: '-0.03em', lineHeight: 1.2 }}>
             AI Biodiversity Monitor
           </h1>
 
-          <p style={{ fontSize: '0.95rem', color: '#e2e8f0', lineHeight: 1.6, fontWeight: 500 }}>
+          <p style={{ fontSize: '0.95rem', color: '#e2e8f0', textShadow: '0 1px 2px rgba(0,0,0,0.5)', lineHeight: 1.6, fontWeight: 500 }}>
             Identify plants, birds and insects from images, explore species information, and build your biodiversity record.
           </p>
         </div>
@@ -127,7 +129,7 @@ export default function Dashboard() {
       </div>
 
       {/* 3. YOUR BIODIVERSITY OVERVIEW (SECONDARY COMPACT METRICS) */}
-      <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="glass-panel hero-section" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <h3 style={{ fontSize: '1rem', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
           Your Biodiversity Overview
         </h3>
@@ -182,7 +184,7 @@ export default function Dashboard() {
       </div>
 
       {/* 4. RECENT OBSERVATIONS LIST */}
-      <div className="glass-panel" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+      <div className="glass-panel hero-section" style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <div>
             <h3 style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-main)' }}>Recent Observations</h3>

@@ -150,7 +150,19 @@ a:hover {
   box-shadow: var(--shadow-glow);
 }
 
-/* Buttons */
+/* Hero section responsive adjustments */
+.hero-section {
+  min-height: 340px;
+  padding: 56px 48px;
+}
+
+@media (max-width: 640px) {
+  .hero-section {
+    min-height: 260px;
+    padding: 32px 20px;
+  }
+}
+
 .btn {
   display: inline-flex;
   align-items: center;
